@@ -28,7 +28,7 @@
     }
   ],
   "paths": {
-    "/mobile-control": {
+    "/api/mobile-control": {
       "post": {
         "summary": "Invoke a mobile control action",
         "description": "Provides a single entry point to manage contacts, phone calls, SMS, volume, brightness, and theme settings.",
