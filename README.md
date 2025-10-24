@@ -62,8 +62,8 @@ http://hk.wangyaomin.com:5000/download/tool
 
 #### 1. 打包工具文件
 ```bash
-# 创建工具包
-zip -r mobile_control_tool.zip _assets.yaml main.py requirements.txt README.md
+# 使用打包脚本（文件直接在根目录）
+./package_tool.sh
 ```
 
 #### 2. 上传到可公开访问的位置
@@ -74,6 +74,17 @@ zip -r mobile_control_tool.zip _assets.yaml main.py requirements.txt README.md
 输入工具包的下载URL，例如：
 ```
 https://github.com/your-username/mobile-control-tool/releases/download/v1.0.0/mobile_control_tool.zip
+```
+
+#### 📁 工具包结构说明
+Dify要求zip包中的文件必须直接在根目录中：
+```
+✅ 正确的结构:
+mobile_control_tool.zip
+├── _assets.yaml      # 必需：工具配置
+├── main.py          # 必需：工具代码
+├── requirements.txt # 可选：依赖文件
+└── README.md        # 可选：说明文档
 ```
 
 #### 4. URL导入的注意事项

@@ -11,11 +11,35 @@
 git clone <your-repo-url>
 cd mobile-control-tool
 
-# 2. 一键启动（自动创建环境并安装依赖）
+# 2. 打包工具（文件直接在zip根目录，符合Dify要求）
+./package_tool.sh
+
+# 3. 一键启动服务器
 ./run.sh
 
-# 3. 现在Dify可以直接从您的服务器下载工具了！
+# 4. 现在Dify可以直接从您的服务器下载工具了！
 # 下载链接: http://hk.wangyaomin.com:5000/download/tool
+```
+
+## ✅ 关键修复：工具包结构
+
+**问题**：之前的zip包有子目录结构，Dify无法识别
+```
+❌ 错误的结构:
+mobile_control_tool.zip
+└── mobile_control_tool/
+    ├── _assets.yaml
+    └── main.py
+```
+
+**解决**：文件直接在zip包根目录
+```
+✅ 正确的结构:
+mobile_control_tool.zip
+├── _assets.yaml
+├── main.py
+├── requirements.txt
+└── README.md
 ```
 
 就这样！现在您可以在Dify中使用这个URL直接导入工具了。
