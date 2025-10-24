@@ -1,0 +1,6 @@
+# Mobile Control Tool Dependencies
+# 移动设备控制工具依赖
+
+# Web API服务依赖
+Flask==2.3.3
+Flask-CORS==4.0.0

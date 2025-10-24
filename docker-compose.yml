@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  mobile-control-api:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=5000
+      - DEBUG=false
+    volumes:
+      # 持久化电话本数据
+      - ./phonebook.json:/app/phonebook.json
+      # 如果需要持久化其他数据
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - mobile-control-network
+
+networks:
+  mobile-control-network:
+    driver: bridge
