@@ -81,11 +81,13 @@ def test_main_script():
             print("❌ 缺少MobileControlTool类")
             return False
 
-        # 创建工具实例
-        tool = main.MobileControlTool()
+        # 检查类是否继承自正确的基类
+        from main import MobileControlTool
+        # 注意：这里我们不直接实例化，因为BuiltinTool可能需要特殊初始化
+        # 只需要检查类和方法存在性
 
-        # 测试基本方法
-        methods_to_test = [
+        # 检查必需的方法
+        required_methods = [
             'phonebook_list',
             'phonebook_add',
             'phonebook_delete',
@@ -93,13 +95,25 @@ def test_main_script():
             'send_sms',
             'control_volume',
             'control_brightness',
-            'control_theme'
+            'control_theme',
+            '_invoke'  # Dify工具必需的方法
         ]
 
-        for method_name in methods_to_test:
-            if not hasattr(tool, method_name):
+        for method_name in required_methods:
+            if not hasattr(MobileControlTool, method_name):
                 print(f"❌ 缺少方法: {method_name}")
                 return False
+
+        # 检查类继承关系
+        try:
+            # 尝试导入Dify基类（如果可用）
+            from core.tools.tool.builtin_tool import BuiltinTool
+            if not issubclass(MobileControlTool, BuiltinTool):
+                print("❌ MobileControlTool必须继承自BuiltinTool")
+                return False
+        except ImportError:
+            # 如果无法导入Dify模块，跳过这个检查（用于本地测试）
+            print("⚠️  无法验证类继承关系（Dify环境不可用）")
 
         print("✅ 主脚本验证通过")
         return True
@@ -140,6 +154,12 @@ def test_tool_functionality():
         from main import MobileControlTool
 
         tool = MobileControlTool()
+
+        # 清理测试数据
+        try:
+            tool.phonebook_delete("测试联系人")
+        except:
+            pass  # 忽略删除失败
 
         # 测试电话本功能
         result = tool.phonebook_list()
