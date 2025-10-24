@@ -40,7 +40,7 @@ zip -r mobile_control_tool.zip _assets.yaml main.py requirements.txt README.md
 ```
 
 #### 2. 上传到可公开访问的位置
-- **GitHub Release**: 将zip包上传到GitHub Release
+- **GitHub Release (推荐)**: 自动发布到GitHub Releases
 - **文件共享服务**: 使用网盘或文件共享服务
 - **自己的服务器**: 部署到自己的Web服务器
 
@@ -49,10 +49,31 @@ zip -r mobile_control_tool.zip _assets.yaml main.py requirements.txt README.md
 - 点击"从URL导入"
 - 输入工具包的下载URL，例如：
   ```
-  https://github.com/your-username/mobile-control-tool/releases/download/v1.0.0/mobile_control_tool.zip
+  https://github.com/your-username/mobile-control-tool/releases/download/v1/mobile_control_tool.zip
   ```
 
-#### 4. URL导入的注意事项
+#### 4. 自动发布设置 (推荐)
+本项目支持GitHub Actions自动发布：
+
+1. **推送代码到GitHub**:
+   ```bash
+   git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
+   git push -u origin main
+   ```
+
+2. **自动发布流程**:
+   - 每次推送代码到main分支时自动运行测试
+   - 通过所有测试后自动打包工具
+   - 创建GitHub Release并上传工具包
+
+3. **获取发布链接**:
+   - 访问仓库的 [Releases](https://github.com/YOUR_USERNAME/YOUR_REPO_NAME/releases) 页面
+   - 复制最新版本的下载链接
+   - 在Dify中使用此链接导入工具
+
+详细设置请参考 [GITHUB_SETUP.md](GITHUB_SETUP.md)
+
+#### 5. URL导入的注意事项
 - ✅ URL必须是直接可下载的zip文件链接
 - ✅ 确保zip包包含所有必需的文件（`_assets.yaml`, `main.py`等）
 - ✅ 文件大小不应超过Dify的限制（通常50MB）
