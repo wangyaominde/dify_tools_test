@@ -64,6 +64,9 @@ http://hk.wangyaomin.com:5000/download/tool
 ```bash
 # 使用打包脚本（文件直接在根目录）
 ./package_tool.sh
+
+# 验证工具包是否符合Dify要求
+python3 validate_package.py mobile_control_tool.zip
 ```
 
 #### 2. 上传到可公开访问的位置
