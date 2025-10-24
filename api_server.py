@@ -8,7 +8,7 @@ Mobile Control Tool API Server
 提供RESTful API接口，允许远程访问移动设备控制功能
 """
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import json
 import os
@@ -241,6 +241,34 @@ def send_sms_message():
         return jsonify({
             "success": False,
             "message": f"发送短信失败: {str(e)}"
+        }), 500
+
+@app.route('/download/tool', methods=['GET'])
+def download_tool():
+    """下载Dify工具包"""
+    try:
+        # 检查工具包是否存在
+        tool_package_path = "mobile_control_tool.zip"
+
+        if not os.path.exists(tool_package_path):
+            return jsonify({
+                "success": False,
+                "message": "工具包不存在，请先运行打包脚本"
+            }), 404
+
+        # 返回文件下载
+        return send_file(
+            tool_package_path,
+            as_attachment=True,
+            download_name="mobile_control_tool.zip",
+            mimetype="application/zip"
+        )
+
+    except Exception as e:
+        logger.error(f"下载工具包异常: {e}")
+        return jsonify({
+            "success": False,
+            "message": f"下载失败: {str(e)}"
         }), 500
 
 @app.errorhandler(404)

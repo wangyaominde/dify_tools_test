@@ -1,5 +1,25 @@
 # 移动设备控制工具部署指南
 
+## 🚀 超级简单的部署方案
+
+**只需要一个命令就能让Dify从您的服务器下载工具！**
+
+### 在 hk.wangyaomin.com 上部署
+
+```bash
+# 1. 上传文件到服务器
+git clone <your-repo-url>
+cd mobile-control-tool
+
+# 2. 一键启动（自动创建环境并安装依赖）
+./run.sh
+
+# 3. 现在Dify可以直接从您的服务器下载工具了！
+# 下载链接: http://hk.wangyaomin.com:5000/download/tool
+```
+
+就这样！现在您可以在Dify中使用这个URL直接导入工具了。
+
 ## 在 hk.wangyaomin.com 服务器上部署和测试
 
 ### 1. 上传文件到服务器

@@ -30,27 +30,51 @@
    - 根据界面提示配置各项参数
    - 测试工具连接性
 
-### 方式二：通过URL导入（推荐用于部署）
-如果您想通过URL导入工具，需要将工具部署到可公开访问的位置：
+### 方式二：通过URL导入（推荐！超简单）
+
+**直接使用我们的API服务器提供下载链接！**
+
+#### 1. 启动API服务器
+```bash
+# 一键启动服务器
+./run.sh
+```
+
+#### 2. 获取下载链接
+服务器启动后，下载链接就是：
+```
+http://your-server:5000/download/tool
+```
+
+例如，如果您的服务器是 hk.wangyaomin.com：
+```
+http://hk.wangyaomin.com:5000/download/tool
+```
+
+#### 3. 在Dify中导入
+- 在Dify Studio中选择"工具" → "自定义工具"
+- 点击"从URL导入"
+- 输入上面的下载链接
+- 完成导入！
+
+#### 传统方式（如果需要手动上传）
+如果您想上传到其他地方：
 
 #### 1. 打包工具文件
 ```bash
-# 创建工具包（排除虚拟环境和临时文件）
+# 创建工具包
 zip -r mobile_control_tool.zip _assets.yaml main.py requirements.txt README.md
 ```
 
 #### 2. 上传到可公开访问的位置
 - **GitHub Release**: 将zip包上传到GitHub Release
 - **文件共享服务**: 使用网盘或文件共享服务
-- **自己的服务器**: 部署到自己的Web服务器
 
 #### 3. 在Dify中通过URL导入
-- 在Dify Studio中选择"工具" → "自定义工具"
-- 点击"从URL导入"
-- 输入工具包的下载URL，例如：
-  ```
-  https://github.com/your-username/mobile-control-tool/releases/download/v1.0.0/mobile_control_tool.zip
-  ```
+输入工具包的下载URL，例如：
+```
+https://github.com/your-username/mobile-control-tool/releases/download/v1.0.0/mobile_control_tool.zip
+```
 
 #### 4. URL导入的注意事项
 - ✅ URL必须是直接可下载的zip文件链接
@@ -141,6 +165,7 @@ docker run -p 5000:5000 mobile-control-tool
 - `POST /api/system/theme` - 控制主题
 - `POST /api/communication/call` - 拨打电话
 - `POST /api/communication/sms` - 发送短信
+- `GET /download/tool` - 下载Dify工具包
 
 #### API使用示例
 ```bash
