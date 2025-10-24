@@ -18,40 +18,50 @@ done
 
 echo "✅ 必需文件检查通过"
 
-# 定义要包含的文件
+# 定义要包含的文件（Dify工具必需的文件）
 include_files=(
     "_assets.yaml"
     "main.py"
+)
+
+# 定义可选文件
+optional_files=(
     "requirements.txt"
     "README.md"
-    "api_server.py"
-    "docker-compose.yml"
-    "Dockerfile"
-    "run.sh"
 )
 
 # 创建临时目录
 temp_dir=$(mktemp -d)
-package_dir="$temp_dir/mobile_control_tool"
+package_dir="$temp_dir"
 
-echo "🔧 创建包结构..."
-mkdir -p "$package_dir"
+echo "🔧 创建包结构（文件直接在根目录）..."
 
-# 复制文件
+# 复制必需文件
 for file in "${include_files[@]}"; do
     if [ -f "$file" ]; then
         cp "$file" "$package_dir/"
-        echo "  📄 复制: $file"
+        echo "  📄 复制必需文件: $file"
     else
-        echo "  ⚠️  跳过: $file (文件不存在)"
+        echo "❌ 错误: 缺少必需文件 $file"
+        exit 1
     fi
 done
 
-# 创建zip包
+# 复制可选文件
+for file in "${optional_files[@]}"; do
+    if [ -f "$file" ]; then
+        cp "$file" "$package_dir/"
+        echo "  📄 复制可选文件: $file"
+    else
+        echo "  ⚠️  跳过可选文件: $file (文件不存在)"
+    fi
+done
+
+# 创建zip包（文件直接在根目录）
 package_name="mobile_control_tool.zip"
-echo "🗜️  创建压缩包: $package_name"
+echo "🗜️  创建压缩包（文件在根目录）..."
 cd "$temp_dir"
-zip -r "$package_name" "mobile_control_tool/"
+zip "$package_name" _assets.yaml main.py requirements.txt README.md
 
 # 移动到当前目录
 mv "$package_name" "$OLDPWD/"
