@@ -30,103 +30,45 @@
    - 根据界面提示配置各项参数
    - 测试工具连接性
 
-### 方式二：通过URL导入（推荐！超简单）
+### 方式二：直接导入Schema（推荐！最简单）
 
-**直接使用我们的API服务器提供下载链接！**
+**直接在Dify Studio中粘贴 `_assets.yaml` 的内容！**
 
-#### 1. 启动API服务器
-```bash
-# 一键启动服务器
-./run.sh
-```
+#### 1. 复制Schema内容
+复制 `_assets.yaml` 文件的完整内容
 
-#### 2. 获取下载链接
-服务器启动后，下载链接就是：
-```
-http://your-server:5000/download/tool
-```
-
-例如，如果您的服务器是 hk.wangyaomin.com：
-```
-http://hk.wangyaomin.com:5000/download/tool
-```
-
-#### 3. 在Dify中导入
+#### 2. 在Dify中导入
 - 在Dify Studio中选择"工具" → "自定义工具"
-- 点击"从URL导入"
-- 输入上面的下载链接
+- 点击"从Schema导入"或直接粘贴YAML内容
+- 粘贴 `_assets.yaml` 的完整内容
 - 完成导入！
 
-#### 传统方式（如果需要手动上传）
-如果您想上传到其他地方：
-
-#### 1. 打包工具文件
-```bash
-# 使用打包脚本（文件直接在根目录）
-./package_tool.sh
-
-# 验证工具包是否符合Dify要求
-python3 validate_package.py mobile_control_tool.zip
-```
-
-#### 2. 上传到可公开访问的位置
-- **GitHub Release**: 将zip包上传到GitHub Release
-- **文件共享服务**: 使用网盘或文件共享服务
-
-#### 3. 在Dify中通过URL导入
-输入工具包的下载URL，例如：
-```
-https://github.com/your-username/mobile-control-tool/releases/download/v1.0.0/mobile_control_tool.zip
-```
-
-#### 📁 工具包结构说明
-Dify要求zip包中的文件必须直接在根目录中：
-```
-✅ 正确的结构:
-mobile_control_tool.zip
-├── _assets.yaml      # 必需：工具配置
-├── main.py          # 必需：工具代码
-├── requirements.txt # 可选：依赖文件
-└── README.md        # 可选：说明文档
-```
-
-#### 4. URL导入的注意事项
-- ✅ URL必须是直接可下载的zip文件链接
-- ✅ 确保zip包包含所有必需的文件（`_assets.yaml`, `main.py`等）
-- ✅ 文件大小不应超过Dify的限制（通常50MB）
-- ✅ URL应该稳定且长期有效
-- ❌ 不要包含虚拟环境文件夹（venv/）
-- ❌ 不要包含临时文件或缓存文件
+#### 服务器地址
+工具会自动连接到 `http://hk.wangyaomin.com:5000`，确保您的服务器运行正常。
 
 #### 故障排除
 
-**如果URL导入仍然失败，请检查：**
+**如果Schema导入仍然失败，请检查：**
 
-1. **验证工具包内容**：
+1. **验证Schema格式**：
    ```bash
-   # 检查zip包内容
-   unzip -l mobile_control_tool.zip
-   # 确保包含 _assets.yaml 和 main.py
+   # 检查YAML语法
+   python3 -c "import yaml; yaml.safe_load(open('_assets.yaml'))"
    ```
 
-2. **测试工具配置**：
-   ```bash
-   # 运行验证脚本
-   python3 test_tool.py
-   ```
+2. **检查必需字段**：
+   - `info` - 工具基本信息
+   - `servers` - 服务器地址
+   - `parameters` - 参数定义
 
 3. **常见错误原因**：
-   - `_assets.yaml` 格式错误或缺少必需字段
-   - `main.py` 缺少必需的类或方法
-   - zip包过大（超过50MB）
-   - URL不可访问或不稳定
-   - 网络连接问题
+   - YAML格式错误（缩进、引号等）
+   - 缺少必需字段
+   - 字段名称拼写错误
+   - 参数定义格式不正确
 
-4. **重新打包工具**：
-   ```bash
-   # 使用打包脚本重新创建
-   ./package_tool.sh
-   ```
+4. **服务器连接**：
+   确保 `http://hk.wangyaomin.com:5000` 可以访问
 
 ### 方式二：部署为独立的API服务
 如果需要远程访问，可以将工具部署为独立的Web API服务：

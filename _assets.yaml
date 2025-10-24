@@ -20,7 +20,7 @@ info:
     credential_form_schemas: []
 
 servers:
-  - "http://localhost:5000"
+  - "http://hk.wangyaomin.com:5000"
 
 parameters:
   - name: "action"
