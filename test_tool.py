@@ -31,8 +31,9 @@ def test_yaml_config():
 
         # 检查必需字段
         required_fields = [
-            'identity',
-            'parameters'
+            'openapi',
+            'info',
+            'paths'
         ]
 
         for field in required_fields:
@@ -40,36 +41,55 @@ def test_yaml_config():
                 print(f"❌ 缺少必需字段: {field}")
                 return False
 
-        # 检查identity字段
-        identity = config['identity']
-        required_identity_fields = [
-            'author', 'name', 'label', 'description',
-            'supported_model_types', 'configurate_methods',
-            'provider_credential_schema', 'tool_credential_schema'
-        ]
+        # 检查openapi版本
+        if not isinstance(config['openapi'], str):
+            print("❌ openapi字段必须是字符串")
+            return False
 
-        for field in required_identity_fields:
-            if field not in identity:
-                print(f"❌ identity缺少字段: {field}")
+        # 检查info字段
+        info = config['info']
+        if not isinstance(info, dict):
+            print("❌ info字段必须是对象")
+            return False
+
+        required_info_fields = ['title', 'description', 'version']
+
+        for field in required_info_fields:
+            if field not in info:
+                print(f"❌ info缺少字段: {field}")
                 return False
 
-        # 检查parameters字段
-        parameters = config['parameters']
-        if not isinstance(parameters, list):
-            print("❌ parameters应该是一个列表")
+        # 检查paths字段
+        paths = config['paths']
+        if not isinstance(paths, dict) or not paths:
+            print("❌ paths必须是非空对象")
             return False
 
-        if len(parameters) == 0:
-            print("❌ parameters不能为空")
-            return False
+        # 检查每个路径的定义
+        for path, methods in paths.items():
+            if not isinstance(methods, dict) or not methods:
+                print(f"❌ 路径 '{path}' 必须包含至少一个方法")
+                return False
 
-        # 检查每个参数
-        for param in parameters:
-            required_param_fields = ['name', 'type', 'required', 'label', 'human_description', 'form']
-            for field in required_param_fields:
-                if field not in param:
-                    print(f"❌ 参数 '{param.get('name', 'unknown')}' 缺少字段: {field}")
+            for method, definition in methods.items():
+                if not isinstance(definition, dict):
+                    print(f"❌ 路径 '{path}' 的方法 '{method}' 定义必须是对象")
                     return False
+                if 'operationId' not in definition:
+                    print(f"❌ 路径 '{path}' 的方法 '{method}' 缺少operationId")
+                    return False
+                if 'responses' not in definition:
+                    print(f"❌ 路径 '{path}' 的方法 '{method}' 缺少responses定义")
+                    return False
+
+        # 检查components.schemas
+        components = config.get('components', {})
+        schemas = components.get('schemas', {})
+        required_schemas = ['MobileControlRequest', 'MobileControlResponse']
+        for schema_name in required_schemas:
+            if schema_name not in schemas:
+                print(f"❌ 缺少schema定义: {schema_name}")
+                return False
 
         print("✅ YAML配置文件验证通过")
         return True
