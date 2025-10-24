@@ -8,7 +8,17 @@ Dify工具测试脚本
 
 import json
 import os
-import yaml
+try:
+    import yaml  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover - fallback for offline environments
+    import json
+    from types import SimpleNamespace
+
+    def _load_json(stream):
+        content = stream.read() if hasattr(stream, "read") else str(stream)
+        return json.loads(content)
+
+    yaml = SimpleNamespace(safe_load=_load_json)
 import sys
 
 def test_yaml_config():

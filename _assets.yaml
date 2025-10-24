@@ -1,162 +1,235 @@
-info:
-  author: "wangyaomin"
-  name: "mobile_control_tool"
-  label:
-    en_US: "Mobile Control Tool"
-    zh_Hans: "移动设备控制工具"
-  description:
-    en_US: "A tool for controlling mobile device functions including phonebook, calling, SMS, volume, brightness, and theme"
-    zh_Hans: "一个用于控制移动设备功能的工具，包括电话本、打电话、发短信、音量、亮度和主题"
-  icon: "mobile.svg"
-  tags:
-    - "mobile"
-    - "control"
-    - "communication"
-  supported_model_types: []
-  configurate_methods: ["predefined-model"]
-  provider_credential_schema:
-    credential_form_schemas: []
-  tool_credential_schema:
-    credential_form_schemas: []
-
-servers:
-  - "http://hk.wangyaomin.com:5000"
-
-parameters:
-  - name: "action"
-    type: "select"
-    required: true
-    label:
-      en_US: "Action"
-      zh_Hans: "操作"
-    human_description:
-      en_US: "Select the action you want to perform"
-      zh_Hans: "选择您要执行的操作"
-    form: "llm"
-    options:
-      - value: "phonebook_list"
-        label:
-          en_US: "List Phonebook"
-          zh_Hans: "查看电话本"
-      - value: "phonebook_add"
-        label:
-          en_US: "Add Contact"
-          zh_Hans: "添加联系人"
-      - value: "phonebook_delete"
-        label:
-          en_US: "Delete Contact"
-          zh_Hans: "删除联系人"
-      - value: "call"
-        label:
-          en_US: "Make Call"
-          zh_Hans: "拨打电话"
-      - value: "sms"
-        label:
-          en_US: "Send SMS"
-          zh_Hans: "发送短信"
-      - value: "volume"
-        label:
-          en_US: "Control Volume"
-          zh_Hans: "控制音量"
-      - value: "brightness"
-        label:
-          en_US: "Control Brightness"
-          zh_Hans: "控制亮度"
-      - value: "theme"
-        label:
-          en_US: "Control Theme"
-          zh_Hans: "控制主题"
-
-  - name: "contact_name"
-    type: "string"
-    required: false
-    label:
-      en_US: "Contact Name"
-      zh_Hans: "联系人姓名"
-    human_description:
-      en_US: "Name of the contact (required for add/delete operations)"
-      zh_Hans: "联系人姓名（添加/删除操作时必需）"
-    form: "llm"
-
-  - name: "contact_alias"
-    type: "string"
-    required: false
-    label:
-      en_US: "Contact Alias"
-      zh_Hans: "联系人别名"
-    human_description:
-      en_US: "Alias/nickname for the contact (optional)"
-      zh_Hans: "联系人的别名/昵称（可选）"
-    form: "llm"
-
-  - name: "phone_number"
-    type: "string"
-    required: false
-    label:
-      en_US: "Phone Number"
-      zh_Hans: "电话号码"
-    human_description:
-      en_US: "Phone number (required for add contact and call operations)"
-      zh_Hans: "电话号码（添加联系人和拨打电话时必需）"
-    form: "llm"
-
-  - name: "sms_message"
-    type: "string"
-    required: false
-    label:
-      en_US: "SMS Message"
-      zh_Hans: "短信内容"
-    human_description:
-      en_US: "Content of the SMS message"
-      zh_Hans: "短信的内容"
-    form: "llm"
-
-  - name: "volume_level"
-    type: "number"
-    required: false
-    label:
-      en_US: "Volume Level"
-      zh_Hans: "音量等级"
-    human_description:
-      en_US: "Volume level from 0 to 100"
-      zh_Hans: "音量等级从0到100"
-    form: "llm"
-    min: 0
-    max: 100
-
-  - name: "brightness_level"
-    type: "number"
-    required: false
-    label:
-      en_US: "Brightness Level"
-      zh_Hans: "亮度等级"
-    human_description:
-      en_US: "Brightness level from 0 to 100"
-      zh_Hans: "亮度等级从0到100"
-    form: "llm"
-    min: 0
-    max: 100
-
-  - name: "theme_mode"
-    type: "select"
-    required: false
-    label:
-      en_US: "Theme Mode"
-      zh_Hans: "主题模式"
-    human_description:
-      en_US: "Select theme mode"
-      zh_Hans: "选择主题模式"
-    form: "llm"
-    options:
-      - value: "light"
-        label:
-          en_US: "Light"
-          zh_Hans: "浅色"
-      - value: "dark"
-        label:
-          en_US: "Dark"
-          zh_Hans: "深色"
-      - value: "auto"
-        label:
-          en_US: "Auto"
-          zh_Hans: "自动"
+{
+  "identity": {
+    "author": "wangyaomin",
+    "name": "mobile_control_tool",
+    "label": {
+      "en_US": "Mobile Control Tool",
+      "zh_Hans": "移动设备控制工具"
+    },
+    "description": {
+      "en_US": "Control phonebook, calling, SMS, volume, brightness, and theme on mobile devices.",
+      "zh_Hans": "控制移动设备的电话本、通话、短信、音量、亮度和主题。"
+    },
+    "icon": "mobile.svg",
+    "tags": [
+      "mobile",
+      "control",
+      "communication"
+    ],
+    "supported_model_types": [],
+    "configurate_methods": [
+      "predefined-model"
+    ],
+    "provider_credential_schema": {
+      "credential_form_schemas": []
+    },
+    "tool_credential_schema": {
+      "credential_form_schemas": []
+    }
+  },
+  "servers": [
+    {
+      "url": "http://hk.wangyaomin.com:5000",
+      "name": "production"
+    }
+  ],
+  "parameters": [
+    {
+      "name": "action",
+      "type": "select",
+      "required": true,
+      "label": {
+        "en_US": "Action",
+        "zh_Hans": "操作"
+      },
+      "human_description": {
+        "en_US": "Select the action you want to perform",
+        "zh_Hans": "选择您要执行的操作"
+      },
+      "form": "llm",
+      "options": [
+        {
+          "value": "phonebook_list",
+          "label": {
+            "en_US": "List Phonebook",
+            "zh_Hans": "查看电话本"
+          }
+        },
+        {
+          "value": "phonebook_add",
+          "label": {
+            "en_US": "Add Contact",
+            "zh_Hans": "添加联系人"
+          }
+        },
+        {
+          "value": "phonebook_delete",
+          "label": {
+            "en_US": "Delete Contact",
+            "zh_Hans": "删除联系人"
+          }
+        },
+        {
+          "value": "call",
+          "label": {
+            "en_US": "Make Call",
+            "zh_Hans": "拨打电话"
+          }
+        },
+        {
+          "value": "sms",
+          "label": {
+            "en_US": "Send SMS",
+            "zh_Hans": "发送短信"
+          }
+        },
+        {
+          "value": "volume",
+          "label": {
+            "en_US": "Control Volume",
+            "zh_Hans": "控制音量"
+          }
+        },
+        {
+          "value": "brightness",
+          "label": {
+            "en_US": "Control Brightness",
+            "zh_Hans": "控制亮度"
+          }
+        },
+        {
+          "value": "theme",
+          "label": {
+            "en_US": "Control Theme",
+            "zh_Hans": "控制主题"
+          }
+        }
+      ]
+    },
+    {
+      "name": "contact_name",
+      "type": "string",
+      "required": false,
+      "label": {
+        "en_US": "Contact Name",
+        "zh_Hans": "联系人姓名"
+      },
+      "human_description": {
+        "en_US": "Name of the contact (required for add/delete operations)",
+        "zh_Hans": "联系人姓名（添加/删除操作时必需）"
+      },
+      "form": "llm"
+    },
+    {
+      "name": "contact_alias",
+      "type": "string",
+      "required": false,
+      "label": {
+        "en_US": "Contact Alias",
+        "zh_Hans": "联系人别名"
+      },
+      "human_description": {
+        "en_US": "Alias or nickname for the contact (optional)",
+        "zh_Hans": "联系人的别名或昵称（可选）"
+      },
+      "form": "llm"
+    },
+    {
+      "name": "phone_number",
+      "type": "string",
+      "required": false,
+      "label": {
+        "en_US": "Phone Number",
+        "zh_Hans": "电话号码"
+      },
+      "human_description": {
+        "en_US": "Phone number (required for add contact, call, and SMS operations)",
+        "zh_Hans": "电话号码（添加联系人、拨打电话和发送短信时必需）"
+      },
+      "form": "llm"
+    },
+    {
+      "name": "sms_message",
+      "type": "string",
+      "required": false,
+      "label": {
+        "en_US": "SMS Message",
+        "zh_Hans": "短信内容"
+      },
+      "human_description": {
+        "en_US": "Content of the SMS message",
+        "zh_Hans": "短信的内容"
+      },
+      "form": "llm"
+    },
+    {
+      "name": "volume_level",
+      "type": "number",
+      "required": false,
+      "label": {
+        "en_US": "Volume Level",
+        "zh_Hans": "音量等级"
+      },
+      "human_description": {
+        "en_US": "Volume level from 0 to 100",
+        "zh_Hans": "音量等级从0到100"
+      },
+      "form": "llm",
+      "min": 0,
+      "max": 100
+    },
+    {
+      "name": "brightness_level",
+      "type": "number",
+      "required": false,
+      "label": {
+        "en_US": "Brightness Level",
+        "zh_Hans": "亮度等级"
+      },
+      "human_description": {
+        "en_US": "Brightness level from 0 to 100",
+        "zh_Hans": "亮度等级从0到100"
+      },
+      "form": "llm",
+      "min": 0,
+      "max": 100
+    },
+    {
+      "name": "theme_mode",
+      "type": "select",
+      "required": false,
+      "label": {
+        "en_US": "Theme Mode",
+        "zh_Hans": "主题模式"
+      },
+      "human_description": {
+        "en_US": "Select theme mode",
+        "zh_Hans": "选择主题模式"
+      },
+      "form": "llm",
+      "options": [
+        {
+          "value": "light",
+          "label": {
+            "en_US": "Light",
+            "zh_Hans": "浅色"
+          }
+        },
+        {
+          "value": "dark",
+          "label": {
+            "en_US": "Dark",
+            "zh_Hans": "深色"
+          }
+        },
+        {
+          "value": "auto",
+          "label": {
+            "en_US": "Auto",
+            "zh_Hans": "自动"
+          }
+        }
+      ]
+    }
+  ]
+}
