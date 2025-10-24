@@ -12,6 +12,12 @@ identity:
     - "mobile"
     - "control"
     - "communication"
+  supported_model_types: []
+  configurate_methods: []
+  provider_credential_schema:
+    credential_form_schemas: []
+  tool_credential_schema:
+    credential_form_schemas: []
 
 parameters:
   - name: "action"

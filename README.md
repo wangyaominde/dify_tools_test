@@ -30,6 +30,36 @@
    - 根据界面提示配置各项参数
    - 测试工具连接性
 
+### 方式二：通过URL导入（推荐用于部署）
+如果您想通过URL导入工具，需要将工具部署到可公开访问的位置：
+
+#### 1. 打包工具文件
+```bash
+# 创建工具包（排除虚拟环境和临时文件）
+zip -r mobile_control_tool.zip _assets.yaml main.py requirements.txt README.md
+```
+
+#### 2. 上传到可公开访问的位置
+- **GitHub Release**: 将zip包上传到GitHub Release
+- **文件共享服务**: 使用网盘或文件共享服务
+- **自己的服务器**: 部署到自己的Web服务器
+
+#### 3. 在Dify中通过URL导入
+- 在Dify Studio中选择"工具" → "自定义工具"
+- 点击"从URL导入"
+- 输入工具包的下载URL，例如：
+  ```
+  https://github.com/your-username/mobile-control-tool/releases/download/v1.0.0/mobile_control_tool.zip
+  ```
+
+#### 4. URL导入的注意事项
+- ✅ URL必须是直接可下载的zip文件链接
+- ✅ 确保zip包包含所有必需的文件（`_assets.yaml`, `main.py`等）
+- ✅ 文件大小不应超过Dify的限制（通常50MB）
+- ✅ URL应该稳定且长期有效
+- ❌ 不要包含虚拟环境文件夹（venv/）
+- ❌ 不要包含临时文件或缓存文件
+
 ### 方式二：部署为独立的API服务
 如果需要远程访问，可以将工具部署为独立的Web API服务：
 
