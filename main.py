@@ -1,585 +1,509 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""Mobile device control tool implementation for Dify."""
+
+from __future__ import annotations
 
 import json
-import os
-import subprocess
-import platform
-from typing import Dict, List, Any, Optional
 import logging
+import os
+import platform
+import subprocess
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional
 
-# 配置日志
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# ---------------------------------------------------------------------------
+# Logging configuration
+# ---------------------------------------------------------------------------
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
 logger = logging.getLogger(__name__)
 
-# 尝试导入Dify基类，如果不可用则使用本地实现
-try:
+# ---------------------------------------------------------------------------
+# Dify compatibility layer
+# ---------------------------------------------------------------------------
+try:  # pragma: no cover - only executed in real Dify runtime
     from core.tools.tool.builtin_tool import BuiltinTool
     from core.tools.entities.tool_entities import ToolInvokeMessage
-except ImportError:
-    # 本地开发时的替代实现
-    class BuiltinTool:
-        pass
+except ImportError:  # Local development fallback
 
-    class ToolInvokeMessage:
+    class BuiltinTool:  # type: ignore[too-few-public-methods]
+        """Fallback base class matching Dify's BuiltinTool interface."""
+
+    class ToolInvokeMessage(dict):  # pragma: no cover - simple stub
+        """Simplified fallback implementation for local development."""
+
         @staticmethod
-        def Text(content: str) -> 'ToolInvokeMessage':
-            return {"type": "text", "content": content}
+        def Text(content: str) -> "ToolInvokeMessage":
+            return ToolInvokeMessage({"type": "text", "content": content})
 
 
-class MobileControlTool(BuiltinTool):
-    """移动设备控制工具类"""
+# ---------------------------------------------------------------------------
+# Data models and helpers
+# ---------------------------------------------------------------------------
+@dataclass
+class Contact:
+    """Represents a phonebook contact."""
 
-    def __init__(self):
-        self.phonebook_file = "phonebook.json"
-        self.system = platform.system().lower()
-        self._ensure_phonebook_file()
+    name: str
+    phone: str
+    alias: str = ""
 
-    def _ensure_phonebook_file(self):
-        """确保电话本文件存在"""
-        if not os.path.exists(self.phonebook_file):
-            with open(self.phonebook_file, 'w', encoding='utf-8') as f:
-                json.dump({}, f, ensure_ascii=False, indent=2)
+    def to_dict(self) -> Dict[str, str]:
+        return {"name": self.name, "phone": self.phone, "alias": self.alias}
 
-    def _load_phonebook(self) -> Dict[str, Dict[str, str]]:
-        """加载电话本数据"""
+
+class PhonebookRepository:
+    """Persistence layer for phonebook data stored in JSON format."""
+
+    def __init__(self, file_path: Path):
+        self.file_path = file_path
+        self._ensure_file()
+
+    def _ensure_file(self) -> None:
+        if not self.file_path.exists():
+            logger.debug("Creating phonebook file at %s", self.file_path)
+            self._write({})
+
+    def _read(self) -> Dict[str, Dict[str, str]]:
         try:
-            with open(self.phonebook_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                # 兼容旧格式，如果是旧格式则转换
-                if data and isinstance(next(iter(data.values())), str):
-                    # 旧格式: {"name": "phone"}
-                    # 新格式: {"name": {"phone": "phone", "alias": ""}}
-                    converted_data = {}
-                    for name, phone in data.items():
-                        converted_data[name] = {"phone": phone, "alias": ""}
-                    return converted_data
-                return data
+            with self.file_path.open("r", encoding="utf-8") as handle:
+                data = json.load(handle)
         except (FileNotFoundError, json.JSONDecodeError):
+            logger.warning("Phonebook file missing or corrupt, resetting to empty")
             return {}
 
-    def _save_phonebook(self, phonebook: Dict[str, Dict[str, str]]):
-        """保存电话本数据"""
-        with open(self.phonebook_file, 'w', encoding='utf-8') as f:
-            json.dump(phonebook, f, ensure_ascii=False, indent=2)
+        # Backward compatibility with legacy format {"name": "phone"}
+        if data and isinstance(next(iter(data.values())), str):
+            logger.debug("Detected legacy phonebook format, converting")
+            data = {name: {"phone": phone, "alias": ""} for name, phone in data.items()}
+        return data
 
+    def _write(self, data: Dict[str, Dict[str, str]]) -> None:
+        with self.file_path.open("w", encoding="utf-8") as handle:
+            json.dump(data, handle, ensure_ascii=False, indent=2)
+
+    def list_contacts(self) -> List[Contact]:
+        phonebook = self._read()
+        return [Contact(name, info.get("phone", ""), info.get("alias", "")) for name, info in phonebook.items()]
+
+    def add_contact(self, contact: Contact) -> bool:
+        phonebook = self._read()
+        if contact.name in phonebook:
+            return False
+        phonebook[contact.name] = {"phone": contact.phone, "alias": contact.alias}
+        self._write(phonebook)
+        return True
+
+    def delete_contact(self, name: str) -> Optional[Contact]:
+        phonebook = self._read()
+        info = phonebook.pop(name, None)
+        if info is None:
+            return None
+        self._write(phonebook)
+        return Contact(name, info.get("phone", ""), info.get("alias", ""))
+
+
+class SystemController:
+    """Encapsulates system level operations for different platforms."""
+
+    def __init__(self, system_name: Optional[str] = None):
+        self.system = (system_name or platform.system()).lower()
+
+    # Phone & SMS ------------------------------------------------------------
+    def dial(self, phone_number: str) -> str:
+        self._require_value(phone_number, "电话号码不能为空")
+
+        if self.system == "darwin":
+            subprocess.run(["open", f"tel:{phone_number}"], check=True)
+        elif self.system == "windows":
+            subprocess.run(["start", f"tel:{phone_number}"], shell=True, check=True)
+        elif self.system == "linux":
+            subprocess.run(["xdg-open", f"tel:{phone_number}"], check=True)
+        else:
+            raise ValueError(f"不支持的操作系统: {self.system}")
+
+        return f"正在拨打: {phone_number}"
+
+    def send_sms(self, phone_number: str, message: str) -> str:
+        self._require_value(phone_number, "电话号码不能为空")
+        self._require_value(message, "短信内容不能为空")
+
+        if self.system == "darwin":
+            subprocess.run(["open", f"sms:{phone_number}&body={message}"], check=True)
+        elif self.system == "windows":
+            subprocess.run(["start", f"sms:{phone_number}?body={message}"], shell=True, check=True)
+        elif self.system == "linux":
+            subprocess.run(["xdg-open", f"sms:{phone_number}?body={message}"], check=True)
+        else:
+            raise ValueError(f"不支持的操作系统: {self.system}")
+
+        preview = message[:50]
+        if len(message) > 50:
+            preview += "..."
+        return f"正在发送短信到 {phone_number}: {preview}"
+
+    # Volume ----------------------------------------------------------------
+    def set_volume(self, level: int) -> str:
+        self._validate_percentage(level, "音量等级必须是0-100之间的整数")
+
+        if self.system == "darwin":
+            volume_percent = int((level / 100) * 7)
+            subprocess.run(["osascript", "-e", f"set volume output volume {volume_percent}"], check=True)
+        elif self.system == "windows":
+            try:
+                subprocess.run(["nircmd.exe", "setsysvolume", str(int((level / 100) * 65535))], check=True)
+            except FileNotFoundError as exc:
+                raise FileNotFoundError("需要安装nircmd工具来控制Windows音量") from exc
+        elif self.system == "linux":
+            try:
+                subprocess.run(["amixer", "sset", "Master", f"{level}%"], check=True)
+            except FileNotFoundError as exc:
+                raise FileNotFoundError("需要安装alsa-utils来控制Linux音量") from exc
+        else:
+            raise ValueError(f"不支持的操作系统: {self.system}")
+
+        return f"音量已设置为 {level}%"
+
+    # Brightness ------------------------------------------------------------
+    def set_brightness(self, level: int) -> str:
+        self._validate_percentage(level, "亮度等级必须是0-100之间的整数")
+
+        if self.system == "darwin":
+            try:
+                subprocess.run(["brightness", str(level / 100)], check=True)
+            except FileNotFoundError as exc:
+                raise FileNotFoundError("需要安装brightness工具来控制macOS亮度") from exc
+        elif self.system == "windows":
+            try:
+                subprocess.run(
+                    [
+                        "powershell",
+                        "-Command",
+                        f"(Get-WmiObject -Namespace root/WMI -Class WmiMonitorBrightnessMethods).WmiSetBrightness(1, {level})",
+                    ],
+                    check=True,
+                )
+            except subprocess.CalledProcessError as exc:
+                raise PermissionError("Windows亮度控制需要管理员权限或特定工具") from exc
+        elif self.system == "linux":
+            try:
+                subprocess.run(["brightnessctl", "set", f"{level}%"], check=True)
+            except FileNotFoundError as exc:
+                raise FileNotFoundError("需要安装brightnessctl来控制Linux亮度") from exc
+        else:
+            raise ValueError(f"不支持的操作系统: {self.system}")
+
+        return f"亮度已设置为 {level}%"
+
+    # Theme -----------------------------------------------------------------
+    def set_theme(self, mode: str) -> str:
+        valid_modes = ["light", "dark", "auto"]
+        if mode not in valid_modes:
+            raise ValueError(f"无效的主题模式，可选值: {', '.join(valid_modes)}")
+
+        if self.system == "darwin":
+            if mode == "dark":
+                subprocess.run(
+                    [
+                        "osascript",
+                        "-e",
+                        'tell application "System Events" to tell appearance preferences to set dark mode to true',
+                    ],
+                    check=True,
+                )
+            elif mode == "light":
+                subprocess.run(
+                    [
+                        "osascript",
+                        "-e",
+                        'tell application "System Events" to tell appearance preferences to set dark mode to false',
+                    ],
+                    check=True,
+                )
+            else:
+                raise NotImplementedError("macOS自动主题模式暂不支持")
+        elif self.system == "windows":
+            if mode == "dark":
+                subprocess.run(
+                    [
+                        "reg",
+                        "add",
+                        "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+                        "/v",
+                        "AppsUseLightTheme",
+                        "/t",
+                        "REG_DWORD",
+                        "/d",
+                        "0",
+                        "/f",
+                    ],
+                    check=True,
+                )
+                subprocess.run(
+                    [
+                        "reg",
+                        "add",
+                        "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+                        "/v",
+                        "SystemUsesLightTheme",
+                        "/t",
+                        "REG_DWORD",
+                        "/d",
+                        "0",
+                        "/f",
+                    ],
+                    check=True,
+                )
+            elif mode == "light":
+                subprocess.run(
+                    [
+                        "reg",
+                        "add",
+                        "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+                        "/v",
+                        "AppsUseLightTheme",
+                        "/t",
+                        "REG_DWORD",
+                        "/d",
+                        "1",
+                        "/f",
+                    ],
+                    check=True,
+                )
+                subprocess.run(
+                    [
+                        "reg",
+                        "add",
+                        "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+                        "/v",
+                        "SystemUsesLightTheme",
+                        "/t",
+                        "REG_DWORD",
+                        "/d",
+                        "1",
+                        "/f",
+                    ],
+                    check=True,
+                )
+            else:
+                raise NotImplementedError("Windows自动主题模式暂不支持")
+        elif self.system == "linux":
+            try:
+                if mode == "dark":
+                    subprocess.run(["gsettings", "set", "org.gnome.desktop.interface", "gtk-theme", "Adwaita-dark"], check=True)
+                elif mode == "light":
+                    subprocess.run(["gsettings", "set", "org.gnome.desktop.interface", "gtk-theme", "Adwaita"], check=True)
+                else:
+                    raise NotImplementedError("Linux自动主题模式暂不支持")
+            except FileNotFoundError as exc:
+                raise FileNotFoundError("需要GNOME桌面环境或安装gsettings来控制主题") from exc
+        else:
+            raise ValueError(f"不支持的操作系统: {self.system}")
+
+        return f"主题已设置为: {mode}"
+
+    # Validators ------------------------------------------------------------
+    @staticmethod
+    def _require_value(value: Optional[str], error_message: str) -> None:
+        if not value:
+            raise ValueError(error_message)
+
+    @staticmethod
+    def _validate_percentage(value: Any, error_message: str) -> None:
+        if not isinstance(value, int) or not (0 <= value <= 100):
+            raise ValueError(error_message)
+
+
+# ---------------------------------------------------------------------------
+# Tool implementation
+# ---------------------------------------------------------------------------
+class MobileControlTool(BuiltinTool):
+    """Mobile device control tool compatible with Dify's tool interface."""
+
+    def __init__(self, phonebook_path: Optional[Path] = None, system_controller: Optional[SystemController] = None):
+        self.phonebook = PhonebookRepository(phonebook_path or Path("phonebook.json"))
+        self.system_controller = system_controller or SystemController()
+
+    # Phonebook -------------------------------------------------------------
     def phonebook_list(self) -> Dict[str, Any]:
-        """查看电话本"""
         try:
-            phonebook = self._load_phonebook()
-            if not phonebook:
-                return {
-                    "success": True,
-                    "message": "电话本为空",
-                    "data": []
-                }
+            contacts = self.phonebook.list_contacts()
+            if not contacts:
+                return {"success": True, "message": "电话本为空", "data": []}
 
-            contacts = []
-            for name, info in phonebook.items():
-                contact = {
-                    "name": name,
-                    "phone": info.get("phone", ""),
-                    "alias": info.get("alias", "")
-                }
-                contacts.append(contact)
-
+            contact_dicts = [contact.to_dict() for contact in contacts]
             return {
                 "success": True,
-                "message": f"找到 {len(contacts)} 个联系人",
-                "data": contacts
+                "message": f"找到 {len(contact_dicts)} 个联系人",
+                "data": contact_dicts,
             }
-        except Exception as e:
-            logger.error(f"查看电话本失败: {e}")
-            return {
-                "success": False,
-                "message": f"查看电话本失败: {str(e)}",
-                "data": []
-            }
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.error("查看电话本失败: %s", exc)
+            return {"success": False, "message": f"查看电话本失败: {exc}", "data": []}
 
-    def phonebook_add(self, name: str, phone: str, alias: str = "") -> Dict[str, Any]:
-        """添加联系人"""
+    def phonebook_add(self, name: Optional[str], phone: Optional[str], alias: str = "") -> Dict[str, Any]:
         try:
             if not name or not phone:
-                return {
-                    "success": False,
-                    "message": "姓名和电话号码不能为空"
-                }
+                raise ValueError("姓名和电话号码不能为空")
 
-            phonebook = self._load_phonebook()
-
-            if name in phonebook:
-                return {
-                    "success": False,
-                    "message": f"联系人 '{name}' 已存在"
-                }
-
-            phonebook[name] = {
-                "phone": phone,
-                "alias": alias or ""
-            }
-            self._save_phonebook(phonebook)
+            added = self.phonebook.add_contact(Contact(name=name, phone=phone, alias=alias or ""))
+            if not added:
+                raise ValueError(f"联系人 '{name}' 已存在")
 
             alias_info = f" (别名: {alias})" if alias else ""
-            return {
-                "success": True,
-                "message": f"成功添加联系人 '{name}'{alias_info}: {phone}"
-            }
-        except Exception as e:
-            logger.error(f"添加联系人失败: {e}")
-            return {
-                "success": False,
-                "message": f"添加联系人失败: {str(e)}"
-            }
+            return {"success": True, "message": f"成功添加联系人 '{name}'{alias_info}: {phone}"}
+        except Exception as exc:
+            logger.error("添加联系人失败: %s", exc)
+            return {"success": False, "message": f"添加联系人失败: {exc}"}
 
-    def phonebook_delete(self, name: str) -> Dict[str, Any]:
-        """删除联系人"""
+    def phonebook_delete(self, name: Optional[str]) -> Dict[str, Any]:
         try:
             if not name:
-                return {
-                    "success": False,
-                    "message": "联系人姓名不能为空"
-                }
+                raise ValueError("联系人姓名不能为空")
 
-            phonebook = self._load_phonebook()
+            deleted = self.phonebook.delete_contact(name)
+            if deleted is None:
+                raise ValueError(f"联系人 '{name}' 不存在")
 
-            if name not in phonebook:
-                return {
-                    "success": False,
-                    "message": f"联系人 '{name}' 不存在"
-                }
+            alias_info = f" (别名: {deleted.alias})" if deleted.alias else ""
+            return {"success": True, "message": f"成功删除联系人 '{name}'{alias_info}: {deleted.phone}"}
+        except Exception as exc:
+            logger.error("删除联系人失败: %s", exc)
+            return {"success": False, "message": f"删除联系人失败: {exc}"}
 
-            deleted_contact = phonebook.pop(name)
-            self._save_phonebook(phonebook)
-
-            alias_info = f" (别名: {deleted_contact.get('alias', '')})" if deleted_contact.get('alias') else ""
-            return {
-                "success": True,
-                "message": f"成功删除联系人 '{name}'{alias_info}: {deleted_contact.get('phone', '')}"
-            }
-        except Exception as e:
-            logger.error(f"删除联系人失败: {e}")
-            return {
-                "success": False,
-                "message": f"删除联系人失败: {str(e)}"
-            }
-
-    def make_call(self, phone_number: str) -> Dict[str, Any]:
-        """拨打电话"""
+    # System operations -----------------------------------------------------
+    def make_call(self, phone_number: Optional[str]) -> Dict[str, Any]:
         try:
-            if not phone_number:
-                return {
-                    "success": False,
-                    "message": "电话号码不能为空"
-                }
+            message = self.system_controller.dial(phone_number or "")
+            return {"success": True, "message": message}
+        except subprocess.CalledProcessError as exc:
+            logger.error("拨打电话失败: %s", exc)
+            return {"success": False, "message": f"拨打电话失败: {exc}"}
+        except Exception as exc:
+            logger.error("拨打电话异常: %s", exc)
+            return {"success": False, "message": f"拨打电话异常: {exc}"}
 
-            # 根据不同操作系统执行相应的拨号命令
-            if self.system == "darwin":  # macOS
-                # 在macOS上打开FaceTime或其他电话应用
-                subprocess.run(["open", f"tel:{phone_number}"], check=True)
-                message = f"正在拨打: {phone_number}"
-            elif self.system == "windows":
-                # Windows上可能需要特定的电话应用
-                subprocess.run(["start", f"tel:{phone_number}"], shell=True, check=True)
-                message = f"正在拨打: {phone_number}"
-            elif self.system == "linux":
-                # Linux上可能需要特定的电话应用
-                # 这里使用xdg-open尝试打开tel:链接
-                subprocess.run(["xdg-open", f"tel:{phone_number}"], check=True)
-                message = f"正在拨打: {phone_number}"
-            else:
-                return {
-                    "success": False,
-                    "message": f"不支持的操作系统: {self.system}"
-                }
-
-            return {
-                "success": True,
-                "message": message
-            }
-        except subprocess.CalledProcessError as e:
-            logger.error(f"拨打电话失败: {e}")
-            return {
-                "success": False,
-                "message": f"拨打电话失败: {str(e)}"
-            }
-        except Exception as e:
-            logger.error(f"拨打电话异常: {e}")
-            return {
-                "success": False,
-                "message": f"拨打电话异常: {str(e)}"
-            }
-
-    def send_sms(self, phone_number: str, message: str) -> Dict[str, Any]:
-        """发送短信"""
+    def send_sms(self, phone_number: Optional[str], message: Optional[str]) -> Dict[str, Any]:
         try:
-            if not phone_number:
-                return {
-                    "success": False,
-                    "message": "电话号码不能为空"
-                }
+            response_message = self.system_controller.send_sms(phone_number or "", message or "")
+            return {"success": True, "message": response_message}
+        except subprocess.CalledProcessError as exc:
+            logger.error("发送短信失败: %s", exc)
+            return {"success": False, "message": f"发送短信失败: {exc}"}
+        except Exception as exc:
+            logger.error("发送短信异常: %s", exc)
+            return {"success": False, "message": f"发送短信异常: {exc}"}
 
-            if not message:
-                return {
-                    "success": False,
-                    "message": "短信内容不能为空"
-                }
-
-            # 根据不同操作系统执行相应的发短信命令
-            if self.system == "darwin":  # macOS
-                # 在macOS上打开Messages应用
-                subprocess.run(["open", f"sms:{phone_number}&body={message}"], check=True)
-                result_message = f"正在发送短信到 {phone_number}: {message[:50]}{'...' if len(message) > 50 else ''}"
-            elif self.system == "windows":
-                # Windows上可能需要特定的短信应用
-                subprocess.run(["start", f"sms:{phone_number}?body={message}"], shell=True, check=True)
-                result_message = f"正在发送短信到 {phone_number}: {message[:50]}{'...' if len(message) > 50 else ''}"
-            elif self.system == "linux":
-                # Linux上可能需要特定的短信应用
-                subprocess.run(["xdg-open", f"sms:{phone_number}?body={message}"], check=True)
-                result_message = f"正在发送短信到 {phone_number}: {message[:50]}{'...' if len(message) > 50 else ''}"
-            else:
-                return {
-                    "success": False,
-                    "message": f"不支持的操作系统: {self.system}"
-                }
-
-            return {
-                "success": True,
-                "message": result_message
-            }
-        except subprocess.CalledProcessError as e:
-            logger.error(f"发送短信失败: {e}")
-            return {
-                "success": False,
-                "message": f"发送短信失败: {str(e)}"
-            }
-        except Exception as e:
-            logger.error(f"发送短信异常: {e}")
-            return {
-                "success": False,
-                "message": f"发送短信异常: {str(e)}"
-            }
-
-    def control_volume(self, level: int) -> Dict[str, Any]:
-        """控制音量"""
+    def control_volume(self, level: Optional[int]) -> Dict[str, Any]:
         try:
-            if not isinstance(level, int) or not (0 <= level <= 100):
-                return {
-                    "success": False,
-                    "message": "音量等级必须是0-100之间的整数"
-                }
+            if level is None:
+                raise ValueError("音量等级必须是0-100之间的整数")
+            message = self.system_controller.set_volume(int(level))
+            return {"success": True, "message": message}
+        except subprocess.CalledProcessError as exc:
+            logger.error("控制音量失败: %s", exc)
+            return {"success": False, "message": f"控制音量失败: {exc}"}
+        except Exception as exc:
+            logger.error("控制音量异常: %s", exc)
+            return {"success": False, "message": f"控制音量异常: {exc}"}
 
-            if self.system == "darwin":  # macOS
-                # 使用osascript控制音量
-                volume_percent = int((level / 100) * 7)  # macOS音量范围是0-7
-                subprocess.run([
-                    "osascript", "-e",
-                    f"set volume output volume {volume_percent}"
-                ], check=True)
-                message = f"音量已设置为 {level}%"
-            elif self.system == "windows":
-                # Windows上使用nircmd或其他工具
-                try:
-                    subprocess.run([
-                        "nircmd.exe", "setsysvolume",
-                        str(int((level / 100) * 65535))
-                    ], check=True)
-                    message = f"音量已设置为 {level}%"
-                except FileNotFoundError:
-                    return {
-                        "success": False,
-                        "message": "需要安装nircmd工具来控制Windows音量"
-                    }
-            elif self.system == "linux":
-                # Linux上使用amixer或其他工具
-                try:
-                    subprocess.run([
-                        "amixer", "sset", "Master", f"{level}%"
-                    ], check=True)
-                    message = f"音量已设置为 {level}%"
-                except FileNotFoundError:
-                    return {
-                        "success": False,
-                        "message": "需要安装alsa-utils来控制Linux音量"
-                    }
-            else:
-                return {
-                    "success": False,
-                    "message": f"不支持的操作系统: {self.system}"
-                }
-
-            return {
-                "success": True,
-                "message": message
-            }
-        except subprocess.CalledProcessError as e:
-            logger.error(f"控制音量失败: {e}")
-            return {
-                "success": False,
-                "message": f"控制音量失败: {str(e)}"
-            }
-        except Exception as e:
-            logger.error(f"控制音量异常: {e}")
-            return {
-                "success": False,
-                "message": f"控制音量异常: {str(e)}"
-            }
-
-    def control_brightness(self, level: int) -> Dict[str, Any]:
-        """控制屏幕亮度"""
+    def control_brightness(self, level: Optional[int]) -> Dict[str, Any]:
         try:
-            if not isinstance(level, int) or not (0 <= level <= 100):
-                return {
-                    "success": False,
-                    "message": "亮度等级必须是0-100之间的整数"
-                }
+            if level is None:
+                raise ValueError("亮度等级必须是0-100之间的整数")
+            message = self.system_controller.set_brightness(int(level))
+            return {"success": True, "message": message}
+        except subprocess.CalledProcessError as exc:
+            logger.error("控制亮度失败: %s", exc)
+            return {"success": False, "message": f"控制亮度失败: {exc}"}
+        except Exception as exc:
+            logger.error("控制亮度异常: %s", exc)
+            return {"success": False, "message": f"控制亮度异常: {exc}"}
 
-            if self.system == "darwin":  # macOS
-                # macOS上控制亮度比较复杂，可能需要安装brightness工具
-                try:
-                    subprocess.run([
-                        "brightness", str(level / 100)
-                    ], check=True)
-                    message = f"亮度已设置为 {level}%"
-                except FileNotFoundError:
-                    return {
-                        "success": False,
-                        "message": "需要安装brightness工具来控制macOS亮度"
-                    }
-            elif self.system == "windows":
-                # Windows上使用powercfg或其他工具
-                try:
-                    # 这是一个简化的实现，实际可能需要更复杂的命令
-                    subprocess.run([
-                        "powershell", "-Command",
-                        f"(Get-WmiObject -Namespace root/WMI -Class WmiMonitorBrightnessMethods).WmiSetBrightness(1, {level})"
-                    ], check=True)
-                    message = f"亮度已设置为 {level}%"
-                except Exception:
-                    return {
-                        "success": False,
-                        "message": "Windows亮度控制需要管理员权限或特定工具"
-                    }
-            elif self.system == "linux":
-                # Linux上使用brightnessctl或其他工具
-                try:
-                    subprocess.run([
-                        "brightnessctl", "set", f"{level}%"
-                    ], check=True)
-                    message = f"亮度已设置为 {level}%"
-                except FileNotFoundError:
-                    return {
-                        "success": False,
-                        "message": "需要安装brightnessctl来控制Linux亮度"
-                    }
-            else:
-                return {
-                    "success": False,
-                    "message": f"不支持的操作系统: {self.system}"
-                }
-
-            return {
-                "success": True,
-                "message": message
-            }
-        except subprocess.CalledProcessError as e:
-            logger.error(f"控制亮度失败: {e}")
-            return {
-                "success": False,
-                "message": f"控制亮度失败: {str(e)}"
-            }
-        except Exception as e:
-            logger.error(f"控制亮度异常: {e}")
-            return {
-                "success": False,
-                "message": f"控制亮度异常: {str(e)}"
-            }
-
-    def control_theme(self, mode: str) -> Dict[str, Any]:
-        """控制系统主题"""
+    def control_theme(self, mode: Optional[str]) -> Dict[str, Any]:
         try:
-            valid_modes = ["light", "dark", "auto"]
-            if mode not in valid_modes:
-                return {
-                    "success": False,
-                    "message": f"无效的主题模式，可选值: {', '.join(valid_modes)}"
-                }
+            message = self.system_controller.set_theme(mode or "")
+            return {"success": True, "message": message}
+        except subprocess.CalledProcessError as exc:
+            logger.error("控制主题失败: %s", exc)
+            return {"success": False, "message": f"控制主题失败: {exc}"}
+        except Exception as exc:
+            logger.error("控制主题异常: %s", exc)
+            return {"success": False, "message": f"控制主题异常: {exc}"}
 
-            if self.system == "darwin":  # macOS
-                if mode == "dark":
-                    subprocess.run([
-                        "osascript", "-e",
-                        'tell application "System Events" to tell appearance preferences to set dark mode to true'
-                    ], check=True)
-                elif mode == "light":
-                    subprocess.run([
-                        "osascript", "-e",
-                        'tell application "System Events" to tell appearance preferences to set dark mode to false'
-                    ], check=True)
-                elif mode == "auto":
-                    # macOS auto mode需要更复杂的设置
-                    return {
-                        "success": False,
-                        "message": "macOS自动主题模式暂不支持"
-                    }
-                message = f"主题已设置为: {mode}"
-            elif self.system == "windows":
-                # Windows主题控制
-                if mode == "dark":
-                    subprocess.run([
-                        "reg", "add", "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
-                        "/v", "AppsUseLightTheme", "/t", "REG_DWORD", "/d", "0", "/f"
-                    ], check=True)
-                    subprocess.run([
-                        "reg", "add", "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
-                        "/v", "SystemUsesLightTheme", "/t", "REG_DWORD", "/d", "0", "/f"
-                    ], check=True)
-                elif mode == "light":
-                    subprocess.run([
-                        "reg", "add", "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
-                        "/v", "AppsUseLightTheme", "/t", "REG_DWORD", "/d", "1", "/f"
-                    ], check=True)
-                    subprocess.run([
-                        "reg", "add", "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
-                        "/v", "SystemUsesLightTheme", "/t", "REG_DWORD", "/d", "1", "/f"
-                    ], check=True)
-                elif mode == "auto":
-                    return {
-                        "success": False,
-                        "message": "Windows自动主题模式暂不支持"
-                    }
-                message = f"主题已设置为: {mode}"
-            elif self.system == "linux":
-                # Linux主题控制因桌面环境而异，这里提供一个通用的方案
-                # 大多数Linux发行版使用gsettings
-                try:
-                    if mode == "dark":
-                        subprocess.run([
-                            "gsettings", "set", "org.gnome.desktop.interface", "gtk-theme", "Adwaita-dark"
-                        ], check=True)
-                    elif mode == "light":
-                        subprocess.run([
-                            "gsettings", "set", "org.gnome.desktop.interface", "gtk-theme", "Adwaita"
-                        ], check=True)
-                    elif mode == "auto":
-                        return {
-                            "success": False,
-                            "message": "Linux自动主题模式暂不支持"
-                        }
-                    message = f"主题已设置为: {mode}"
-                except FileNotFoundError:
-                    return {
-                        "success": False,
-                        "message": "需要GNOME桌面环境或安装gsettings来控制主题"
-                    }
-            else:
-                return {
-                    "success": False,
-                    "message": f"不支持的操作系统: {self.system}"
-                }
-
-            return {
-                "success": True,
-                "message": message
-            }
-        except subprocess.CalledProcessError as e:
-            logger.error(f"控制主题失败: {e}")
-            return {
-                "success": False,
-                "message": f"控制主题失败: {str(e)}"
-            }
-        except Exception as e:
-            logger.error(f"控制主题异常: {e}")
-            return {
-                "success": False,
-                "message": f"控制主题异常: {str(e)}"
-            }
+    # Dify entrypoint -------------------------------------------------------
+    def invoke(self, user_id: str, tool_parameters: Dict[str, Any]) -> List[ToolInvokeMessage]:  # pragma: no cover
+        return self._invoke(user_id, tool_parameters)
 
     def _invoke(self, user_id: str, tool_parameters: Dict[str, Any]) -> List[ToolInvokeMessage]:
-        """Dify工具调用入口方法"""
         try:
-            action = tool_parameters.get('action')
+            action = tool_parameters.get("action")
+            result: Dict[str, Any]
 
             if action == "phonebook_list":
                 result = self.phonebook_list()
-
             elif action == "phonebook_add":
-                name = tool_parameters.get('contact_name')
-                phone = tool_parameters.get('phone_number')
-                alias = tool_parameters.get('contact_alias', '')
-                result = self.phonebook_add(name, phone, alias)
-
+                result = self.phonebook_add(
+                    tool_parameters.get("contact_name"),
+                    tool_parameters.get("phone_number"),
+                    tool_parameters.get("contact_alias", ""),
+                )
             elif action == "phonebook_delete":
-                name = tool_parameters.get('contact_name')
-                result = self.phonebook_delete(name)
-
+                result = self.phonebook_delete(tool_parameters.get("contact_name"))
             elif action == "call":
-                phone = tool_parameters.get('phone_number')
-                result = self.make_call(phone)
-
+                result = self.make_call(tool_parameters.get("phone_number"))
             elif action == "sms":
-                phone = tool_parameters.get('phone_number')
-                message = tool_parameters.get('sms_message')
-                result = self.send_sms(phone, message)
-
+                result = self.send_sms(
+                    tool_parameters.get("phone_number"),
+                    tool_parameters.get("sms_message"),
+                )
             elif action == "volume":
-                level = tool_parameters.get('volume_level')
-                if level is not None:
-                    level = int(level)
-                result = self.control_volume(level)
-
+                level = tool_parameters.get("volume_level")
+                result = self.control_volume(int(level) if level is not None else None)
             elif action == "brightness":
-                level = tool_parameters.get('brightness_level')
-                if level is not None:
-                    level = int(level)
-                result = self.control_brightness(level)
-
+                level = tool_parameters.get("brightness_level")
+                result = self.control_brightness(int(level) if level is not None else None)
             elif action == "theme":
-                mode = tool_parameters.get('theme_mode')
-                result = self.control_theme(mode)
-
+                result = self.control_theme(tool_parameters.get("theme_mode"))
             else:
-                result = {
-                    "success": False,
-                    "message": f"未知操作: {action}"
-                }
+                result = {"success": False, "message": f"未知操作: {action}"}
 
-            # 返回Dify格式的消息
             return [ToolInvokeMessage.Text(json.dumps(result, ensure_ascii=False, indent=2))]
-
-        except Exception as e:
-            logger.error(f"Dify工具调用异常: {e}")
-            error_result = {
-                "success": False,
-                "message": f"工具调用失败: {str(e)}"
-            }
-            return [ToolInvokeMessage.Text(json.dumps(error_result, ensure_ascii=False, indent=2))]
+        except Exception as exc:
+            logger.error("Dify工具调用异常: %s", exc)
+            error_payload = {"success": False, "message": f"工具调用失败: {exc}"}
+            return [ToolInvokeMessage.Text(json.dumps(error_payload, ensure_ascii=False, indent=2))]
 
 
-def main():
-    """主函数 - 处理Dify工具调用"""
+# ---------------------------------------------------------------------------
+# Command line interface for local testing
+# ---------------------------------------------------------------------------
+def parse_cli_arguments(arguments: Iterable[str]) -> Dict[str, Any]:
+    parsed: Dict[str, Any] = {}
+    for arg in arguments:
+        if "=" in arg:
+            key, value = arg.split("=", 1)
+            parsed[key] = value
+        else:
+            parsed["action"] = arg
+    return parsed
+
+
+def main() -> None:
     import sys
 
     if len(sys.argv) < 2:
-        print(json.dumps({
-            "error": "缺少参数。请提供action参数。"
-        }, ensure_ascii=False))
+        print(json.dumps({"error": "缺少参数。请提供action参数。"}, ensure_ascii=False))
         return
 
-    # 解析命令行参数
-    args = {}
-    for arg in sys.argv[1:]:
-        if '=' in arg:
-            key, value = arg.split('=', 1)
-            args[key] = value
-        else:
-            args['action'] = arg
-
-    action = args.get('action')
+    args = parse_cli_arguments(sys.argv[1:])
+    action = args.get("action")
     if not action:
-        print(json.dumps({
-            "error": "缺少action参数。"
-        }, ensure_ascii=False))
+        print(json.dumps({"error": "缺少action参数。"}, ensure_ascii=False))
         return
 
     tool = MobileControlTool()
@@ -587,56 +511,36 @@ def main():
     try:
         if action == "phonebook_list":
             result = tool.phonebook_list()
-
         elif action == "phonebook_add":
-            name = args.get('contact_name')
-            phone = args.get('phone_number')
-            alias = args.get('contact_alias', '')
-            result = tool.phonebook_add(name, phone, alias)
-
+            result = tool.phonebook_add(
+                args.get("contact_name"),
+                args.get("phone_number"),
+                args.get("contact_alias", ""),
+            )
         elif action == "phonebook_delete":
-            name = args.get('contact_name')
-            result = tool.phonebook_delete(name)
-
+            result = tool.phonebook_delete(args.get("contact_name"))
         elif action == "call":
-            phone = args.get('phone_number')
-            result = tool.make_call(phone)
-
+            result = tool.make_call(args.get("phone_number"))
         elif action == "sms":
-            phone = args.get('phone_number')
-            message = args.get('sms_message')
-            result = tool.send_sms(phone, message)
-
+            result = tool.send_sms(
+                args.get("phone_number"),
+                args.get("sms_message"),
+            )
         elif action == "volume":
-            level = args.get('volume_level')
-            if level is not None:
-                level = int(level)
-            result = tool.control_volume(level)
-
+            level = args.get("volume_level")
+            result = tool.control_volume(int(level) if level is not None else None)
         elif action == "brightness":
-            level = args.get('brightness_level')
-            if level is not None:
-                level = int(level)
-            result = tool.control_brightness(level)
-
+            level = args.get("brightness_level")
+            result = tool.control_brightness(int(level) if level is not None else None)
         elif action == "theme":
-            mode = args.get('theme_mode')
-            result = tool.control_theme(mode)
-
+            result = tool.control_theme(args.get("theme_mode"))
         else:
-            result = {
-                "success": False,
-                "message": f"未知操作: {action}"
-            }
+            result = {"success": False, "message": f"未知操作: {action}"}
 
         print(json.dumps(result, ensure_ascii=False))
-
-    except Exception as e:
-        logger.error(f"执行操作失败: {e}")
-        print(json.dumps({
-            "success": False,
-            "message": f"执行操作失败: {str(e)}"
-        }, ensure_ascii=False))
+    except Exception as exc:  # pragma: no cover - defensive logging
+        logger.error("执行操作失败: %s", exc)
+        print(json.dumps({"success": False, "message": f"执行操作失败: {exc}"}, ensure_ascii=False))
 
 
 if __name__ == "__main__":
