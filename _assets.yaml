@@ -1,4 +1,4 @@
-identity:
+info:
   author: "wangyaomin"
   name: "mobile_control_tool"
   label:
@@ -13,11 +13,14 @@ identity:
     - "control"
     - "communication"
   supported_model_types: []
-  configurate_methods: []
+  configurate_methods: ["predefined-model"]
   provider_credential_schema:
     credential_form_schemas: []
   tool_credential_schema:
     credential_form_schemas: []
+
+servers:
+  - "http://localhost:5000"
 
 parameters:
   - name: "action"
