@@ -29,7 +29,7 @@ parameters:
     human_description:
       en_US: "Select the action you want to perform"
       zh_Hans: "选择您要执行的操作"
-    form: "form"
+    form: "llm"
     options:
       - value: "phonebook_list"
         label:
@@ -73,7 +73,7 @@ parameters:
     human_description:
       en_US: "Name of the contact (required for add/delete operations)"
       zh_Hans: "联系人姓名（添加/删除操作时必需）"
-    form: "form"
+    form: "llm"
 
   - name: "contact_alias"
     type: "string"
@@ -84,7 +84,7 @@ parameters:
     human_description:
       en_US: "Alias/nickname for the contact (optional)"
       zh_Hans: "联系人的别名/昵称（可选）"
-    form: "form"
+    form: "llm"
 
   - name: "phone_number"
     type: "string"
@@ -95,7 +95,7 @@ parameters:
     human_description:
       en_US: "Phone number (required for add contact and call operations)"
       zh_Hans: "电话号码（添加联系人和拨打电话时必需）"
-    form: "form"
+    form: "llm"
 
   - name: "sms_message"
     type: "string"
@@ -106,7 +106,7 @@ parameters:
     human_description:
       en_US: "Content of the SMS message"
       zh_Hans: "短信的内容"
-    form: "form"
+    form: "llm"
 
   - name: "volume_level"
     type: "number"
@@ -117,7 +117,7 @@ parameters:
     human_description:
       en_US: "Volume level from 0 to 100"
       zh_Hans: "音量等级从0到100"
-    form: "form"
+    form: "llm"
     min: 0
     max: 100
 
@@ -130,7 +130,7 @@ parameters:
     human_description:
       en_US: "Brightness level from 0 to 100"
       zh_Hans: "亮度等级从0到100"
-    form: "form"
+    form: "llm"
     min: 0
     max: 100
 
@@ -143,7 +143,7 @@ parameters:
     human_description:
       en_US: "Select theme mode"
       zh_Hans: "选择主题模式"
-    form: "form"
+    form: "llm"
     options:
       - value: "light"
         label:
