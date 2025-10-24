@@ -8,26 +8,23 @@ import platform
 from typing import Dict, List, Any, Optional
 import logging
 
-# 尝试导入Dify相关模块，如果不可用则使用兼容模式
-try:
-    from core.tools.tool.builtin_tool import BuiltinTool
-    from core.tools.entities.tool_entities import ToolInvokeMessage
-    DIFYY_ENV = True
-except ImportError:
-    # 本地测试环境，没有Dify模块
-    DIFYY_ENV = False
-
-    # 定义兼容的基类和消息类
-    class BuiltinTool:
-        def create_text_message(self, text: str):
-            return {"type": "text", "message": text}
-
-    class ToolInvokeMessage:
-        pass
-
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# 尝试导入Dify基类，如果不可用则使用本地实现
+try:
+    from core.tools.tool.builtin_tool import BuiltinTool
+    from core.tools.entities.tool_entities import ToolInvokeMessage
+except ImportError:
+    # 本地开发时的替代实现
+    class BuiltinTool:
+        pass
+
+    class ToolInvokeMessage:
+        @staticmethod
+        def Text(content: str) -> 'ToolInvokeMessage':
+            return {"type": "text", "content": content}
 
 
 class MobileControlTool(BuiltinTool):
@@ -498,58 +495,149 @@ class MobileControlTool(BuiltinTool):
                 "message": f"控制主题异常: {str(e)}"
             }
 
-    def _invoke(self, user_id: str, tool_parameters: Dict[str, Any]) -> list:
-        """
-        Dify工具调用入口方法
-        """
+    def _invoke(self, user_id: str, tool_parameters: Dict[str, Any]) -> List[ToolInvokeMessage]:
+        """Dify工具调用入口方法"""
         try:
-            action = tool_parameters.get('action', '')
+            action = tool_parameters.get('action')
 
             if action == "phonebook_list":
                 result = self.phonebook_list()
+
             elif action == "phonebook_add":
                 name = tool_parameters.get('contact_name')
                 phone = tool_parameters.get('phone_number')
                 alias = tool_parameters.get('contact_alias', '')
                 result = self.phonebook_add(name, phone, alias)
+
             elif action == "phonebook_delete":
                 name = tool_parameters.get('contact_name')
                 result = self.phonebook_delete(name)
+
             elif action == "call":
                 phone = tool_parameters.get('phone_number')
                 result = self.make_call(phone)
+
             elif action == "sms":
                 phone = tool_parameters.get('phone_number')
                 message = tool_parameters.get('sms_message')
                 result = self.send_sms(phone, message)
+
             elif action == "volume":
                 level = tool_parameters.get('volume_level')
                 if level is not None:
                     level = int(level)
                 result = self.control_volume(level)
+
             elif action == "brightness":
                 level = tool_parameters.get('brightness_level')
                 if level is not None:
                     level = int(level)
                 result = self.control_brightness(level)
+
             elif action == "theme":
                 mode = tool_parameters.get('theme_mode')
                 result = self.control_theme(mode)
+
             else:
                 result = {
                     "success": False,
                     "message": f"未知操作: {action}"
                 }
 
-            # 返回ToolInvokeMessage格式的结果
-            return [self.create_text_message(json.dumps(result, ensure_ascii=False))]
+            # 返回Dify格式的消息
+            return [ToolInvokeMessage.Text(json.dumps(result, ensure_ascii=False, indent=2))]
 
         except Exception as e:
-            logger.error(f"工具调用异常: {e}")
-            return [self.create_text_message(json.dumps({
+            logger.error(f"Dify工具调用异常: {e}")
+            error_result = {
                 "success": False,
                 "message": f"工具调用失败: {str(e)}"
-            }, ensure_ascii=False))]
+            }
+            return [ToolInvokeMessage.Text(json.dumps(error_result, ensure_ascii=False, indent=2))]
 
 
-# Dify工具不需要main函数，Dify会直接调用MobileControlTool类
+def main():
+    """主函数 - 处理Dify工具调用"""
+    import sys
+
+    if len(sys.argv) < 2:
+        print(json.dumps({
+            "error": "缺少参数。请提供action参数。"
+        }, ensure_ascii=False))
+        return
+
+    # 解析命令行参数
+    args = {}
+    for arg in sys.argv[1:]:
+        if '=' in arg:
+            key, value = arg.split('=', 1)
+            args[key] = value
+        else:
+            args['action'] = arg
+
+    action = args.get('action')
+    if not action:
+        print(json.dumps({
+            "error": "缺少action参数。"
+        }, ensure_ascii=False))
+        return
+
+    tool = MobileControlTool()
+
+    try:
+        if action == "phonebook_list":
+            result = tool.phonebook_list()
+
+        elif action == "phonebook_add":
+            name = args.get('contact_name')
+            phone = args.get('phone_number')
+            alias = args.get('contact_alias', '')
+            result = tool.phonebook_add(name, phone, alias)
+
+        elif action == "phonebook_delete":
+            name = args.get('contact_name')
+            result = tool.phonebook_delete(name)
+
+        elif action == "call":
+            phone = args.get('phone_number')
+            result = tool.make_call(phone)
+
+        elif action == "sms":
+            phone = args.get('phone_number')
+            message = args.get('sms_message')
+            result = tool.send_sms(phone, message)
+
+        elif action == "volume":
+            level = args.get('volume_level')
+            if level is not None:
+                level = int(level)
+            result = tool.control_volume(level)
+
+        elif action == "brightness":
+            level = args.get('brightness_level')
+            if level is not None:
+                level = int(level)
+            result = tool.control_brightness(level)
+
+        elif action == "theme":
+            mode = args.get('theme_mode')
+            result = tool.control_theme(mode)
+
+        else:
+            result = {
+                "success": False,
+                "message": f"未知操作: {action}"
+            }
+
+        print(json.dumps(result, ensure_ascii=False))
+
+    except Exception as e:
+        logger.error(f"执行操作失败: {e}")
+        print(json.dumps({
+            "success": False,
+            "message": f"执行操作失败: {str(e)}"
+        }, ensure_ascii=False))
+
+
+if __name__ == "__main__":
+    main()

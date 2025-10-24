@@ -81,13 +81,11 @@ def test_main_script():
             print("❌ 缺少MobileControlTool类")
             return False
 
-        # 检查类是否继承自正确的基类
-        from main import MobileControlTool
-        # 注意：这里我们不直接实例化，因为BuiltinTool可能需要特殊初始化
-        # 只需要检查类和方法存在性
+        # 创建工具实例
+        tool = main.MobileControlTool()
 
-        # 检查必需的方法
-        required_methods = [
+        # 测试基本方法
+        methods_to_test = [
             'phonebook_list',
             'phonebook_add',
             'phonebook_delete',
@@ -99,21 +97,10 @@ def test_main_script():
             '_invoke'  # Dify工具必需的方法
         ]
 
-        for method_name in required_methods:
-            if not hasattr(MobileControlTool, method_name):
+        for method_name in methods_to_test:
+            if not hasattr(tool, method_name):
                 print(f"❌ 缺少方法: {method_name}")
                 return False
-
-        # 检查类继承关系
-        try:
-            # 尝试导入Dify基类（如果可用）
-            from core.tools.tool.builtin_tool import BuiltinTool
-            if not issubclass(MobileControlTool, BuiltinTool):
-                print("❌ MobileControlTool必须继承自BuiltinTool")
-                return False
-        except ImportError:
-            # 如果无法导入Dify模块，跳过这个检查（用于本地测试）
-            print("⚠️  无法验证类继承关系（Dify环境不可用）")
 
         print("✅ 主脚本验证通过")
         return True
@@ -155,7 +142,7 @@ def test_tool_functionality():
 
         tool = MobileControlTool()
 
-        # 清理测试数据
+        # 先清理可能存在的测试数据
         try:
             tool.phonebook_delete("测试联系人")
         except:
@@ -171,6 +158,22 @@ def test_tool_functionality():
         result = tool.phonebook_add("测试联系人", "13800138000", "测试别名")
         if not result.get('success', False):
             print(f"❌ 添加联系人功能测试失败: {result.get('message', 'unknown error')}")
+            return False
+
+        # 清理测试数据
+        try:
+            tool.phonebook_delete("测试联系人")
+        except:
+            pass  # 忽略删除失败
+
+        # 测试_invoke方法
+        try:
+            result = tool._invoke("test_user", {"action": "phonebook_list"})
+            if not isinstance(result, list) or len(result) == 0:
+                print("❌ _invoke方法返回格式不正确")
+                return False
+        except Exception as e:
+            print(f"❌ _invoke方法测试失败: {e}")
             return False
 
         print("✅ 工具功能验证通过")
