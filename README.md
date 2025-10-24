@@ -79,7 +79,7 @@ zip -r mobile_control_tool.zip _assets.yaml main.py requirements.txt README.md
 
 3. **常见错误原因**：
    - `_assets.yaml` 格式错误或缺少必需字段
-   - `main.py` 缺少必需的类或方法
+   - `main.py` 缺少必需的类或方法（必须继承BuiltinTool，实现_invoke方法）
    - zip包过大（超过50MB）
    - URL不可访问或不稳定
    - 网络连接问题
@@ -89,6 +89,24 @@ zip -r mobile_control_tool.zip _assets.yaml main.py requirements.txt README.md
    # 使用打包脚本重新创建
    ./package_tool.sh
    ```
+
+#### 在Dify中使用工具示例
+
+导入工具后，您可以在Dify对话中使用以下方式调用：
+
+**电话本管理**：
+- "帮我查看电话本"
+- "添加联系人张三，电话13800138000，别名小张"
+- "删除联系人张三"
+
+**通信功能**：
+- "打电话给13800138000"
+- "发短信给13800138000，内容：你好"
+
+**系统控制**：
+- "把音量设置为50"
+- "把亮度调整到80"
+- "切换到深色主题"
 
 ### 方式二：部署为独立的API服务
 如果需要远程访问，可以将工具部署为独立的Web API服务：
