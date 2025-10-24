@@ -60,6 +60,36 @@ zip -r mobile_control_tool.zip _assets.yaml main.py requirements.txt README.md
 - ❌ 不要包含虚拟环境文件夹（venv/）
 - ❌ 不要包含临时文件或缓存文件
 
+#### 故障排除
+
+**如果URL导入仍然失败，请检查：**
+
+1. **验证工具包内容**：
+   ```bash
+   # 检查zip包内容
+   unzip -l mobile_control_tool.zip
+   # 确保包含 _assets.yaml 和 main.py
+   ```
+
+2. **测试工具配置**：
+   ```bash
+   # 运行验证脚本
+   python3 test_tool.py
+   ```
+
+3. **常见错误原因**：
+   - `_assets.yaml` 格式错误或缺少必需字段
+   - `main.py` 缺少必需的类或方法
+   - zip包过大（超过50MB）
+   - URL不可访问或不稳定
+   - 网络连接问题
+
+4. **重新打包工具**：
+   ```bash
+   # 使用打包脚本重新创建
+   ./package_tool.sh
+   ```
+
 ### 方式二：部署为独立的API服务
 如果需要远程访问，可以将工具部署为独立的Web API服务：
 
